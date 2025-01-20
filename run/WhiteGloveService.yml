@@ -1,0 +1,7 @@
+server:
+  rootPath: /v1/api/*
+
+logging:
+  level: INFO
+
+
