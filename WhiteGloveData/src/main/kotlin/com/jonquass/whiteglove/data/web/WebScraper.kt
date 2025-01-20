@@ -1,8 +1,8 @@
 package com.jonquass.whiteglove.data.web
 
-import com.jonquass.whiteglove.core.web.web.Header
-import com.jonquass.whiteglove.core.web.web.Page
-import com.jonquass.whiteglove.core.web.web.Request
+import com.jonquass.whiteglove.core.web.Header
+import com.jonquass.whiteglove.core.web.Page
+import com.jonquass.whiteglove.core.web.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
@@ -11,17 +11,21 @@ import java.util.*
 
 class WebScraper {
 
-    fun scrapeUrl(request: Request): Page {
+    fun scrapeLink(request: Request): Page {
         val url = URI(request.url);
-        val doc: Document = Jsoup.connect(url.toString()).get()
+        return scrapeLink(url)
+    }
+
+    fun scrapeLink(link: URI): Page {
+        val doc: Document = Jsoup.connect(link.toString()).get()
         val headers: EnumMap<Header, String> = getHeaders(doc)
         val links: List<URI> = getLinks(doc)
         return Page(
-            url.host,
-            url.scheme,
-            url.path,
-            url.query,
-            url,
+            link.host,
+            link.scheme,
+            link.path,
+            link.query,
+            link,
             headers,
             doc.title(),
             links,

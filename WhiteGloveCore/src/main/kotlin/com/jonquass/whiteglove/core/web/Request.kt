@@ -1,4 +1,4 @@
-package com.jonquass.whiteglove.core.web.web
+package com.jonquass.whiteglove.core.web
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect
 import com.fasterxml.jackson.annotation.JsonProperty

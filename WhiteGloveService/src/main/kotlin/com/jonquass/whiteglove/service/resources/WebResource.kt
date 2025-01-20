@@ -1,10 +1,10 @@
 package com.jonquass.whiteglove.service.resources
 
 import com.google.inject.Inject
+import com.jonquass.whiteglove.core.web.Page
+import com.jonquass.whiteglove.core.web.Request
+import com.jonquass.whiteglove.core.web.response.Response
 import com.jonquass.whiteglove.core.web.response.ResponseType
-import com.jonquass.whiteglove.core.web.web.Page
-import com.jonquass.whiteglove.core.web.web.Request
-import com.jonquass.whiteglove.core.web.web.Response
 import com.jonquass.whiteglove.data.web.WebCrawler
 import com.jonquass.whiteglove.data.web.WebScraper
 import jakarta.ws.rs.Consumes
@@ -34,7 +34,7 @@ class WebResource {
     @POST
     @Path("/scrape")
     fun scrapeUrl(request: Request): Response {
-        val page: Page = webScraper.scrapeUrl(request)
+        val page: Page = webScraper.scrapeLink(request)
         return Response(ResponseType.SUCCESS, page)
     }
 
