@@ -1,5 +1,6 @@
 package com.jonquass.whiteglove.service.resources
 
+import com.google.inject.Inject
 import com.jonquass.whiteglove.core.web.response.ResponseType
 import com.jonquass.whiteglove.core.web.web.Page
 import com.jonquass.whiteglove.core.web.web.Request
@@ -17,8 +18,11 @@ import jakarta.ws.rs.core.MediaType
 @Produces(MediaType.APPLICATION_JSON)
 class WebResource {
 
-    private var webCrawler: WebCrawler = WebCrawler()
-    private var webScraper: WebScraper = WebScraper()
+    @Inject
+    lateinit var webCrawler: WebCrawler
+
+    @Inject
+    lateinit var webScraper: WebScraper
 
     @POST
     @Path("/crawl")
