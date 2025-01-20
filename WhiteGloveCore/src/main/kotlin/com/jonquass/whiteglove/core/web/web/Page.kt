@@ -1,4 +1,4 @@
-package com.jonquass.whiteglove.core.web.webscrape
+package com.jonquass.whiteglove.core.web.web
 
 import java.net.URI
 

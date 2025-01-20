@@ -1,4 +1,4 @@
-package com.jonquass.whiteglove.core.web.webscrape
+package com.jonquass.whiteglove.core.web.web
 
 enum class Header(val attribute: String) {
 

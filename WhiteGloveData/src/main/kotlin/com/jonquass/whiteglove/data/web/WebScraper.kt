@@ -1,8 +1,8 @@
-package com.jonquass.whiteglove.data.webscrape
+package com.jonquass.whiteglove.data.web
 
-import com.jonquass.whiteglove.core.web.webscrape.Header
-import com.jonquass.whiteglove.core.web.webscrape.Page
-import com.jonquass.whiteglove.core.web.webscrape.WebScrapeRequest
+import com.jonquass.whiteglove.core.web.web.Header
+import com.jonquass.whiteglove.core.web.web.Page
+import com.jonquass.whiteglove.core.web.web.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
@@ -11,8 +11,8 @@ import java.util.*
 
 class WebScraper {
 
-    fun scrapeUrl(webScrapeRequest: WebScrapeRequest) : Page {
-        val url = URI(webScrapeRequest.url)
+    fun scrapeUrl(request: Request): Page {
+        val url = URI(request.url);
         val doc: Document = Jsoup.connect(url.toString()).get()
         val headers: EnumMap<Header, String> = getHeaders(doc)
         val links: List<URI> = getLinks(doc)
@@ -29,14 +29,14 @@ class WebScraper {
         )
     }
 
-    private fun getHeaders(doc: Document) : EnumMap<Header, String> {
-        val headers : Elements = doc.select("meta")
+    private fun getHeaders(doc: Document): EnumMap<Header, String> {
+        val headers: Elements = doc.select("meta")
         val headersMap: EnumMap<Header, String> = EnumMap(Header::class.java)
         for (header in headers) {
             val content = header.attr("content")
-            when(header.attr("property")) {
+            when (header.attr("property")) {
                 Header.OG_TITLE.attribute -> headersMap[Header.OG_TITLE] = content
-                Header.OG_DESCRIPTION.attribute ->  headersMap[Header.OG_DESCRIPTION] = content
+                Header.OG_DESCRIPTION.attribute -> headersMap[Header.OG_DESCRIPTION] = content
                 Header.OG_IMAGE.attribute -> headersMap[Header.OG_IMAGE] = content
                 Header.OG_TYPE.attribute -> headersMap[Header.OG_TYPE] = content
                 Header.OG_URL.attribute -> headersMap[Header.OG_URL] = content
@@ -46,7 +46,7 @@ class WebScraper {
         return headersMap
     }
 
-    private fun getLinks(doc: Document) : List<URI> {
+    private fun getLinks(doc: Document): List<URI> {
         return doc.body()
             .getElementsByTag("a")
             .stream()
