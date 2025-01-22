@@ -5,7 +5,6 @@ import com.jonquass.whiteglove.core.web.Page
 import com.jonquass.whiteglove.core.web.Request
 import com.jonquass.whiteglove.core.web.response.Response
 import com.jonquass.whiteglove.core.web.response.ResponseType
-import com.jonquass.whiteglove.data.web.WebCrawler
 import com.jonquass.whiteglove.data.web.WebScraper
 import jakarta.ws.rs.Consumes
 import jakarta.ws.rs.POST
@@ -16,20 +15,7 @@ import jakarta.ws.rs.core.MediaType
 @Path("/web")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-class WebResource {
-
-    @Inject
-    lateinit var webCrawler: WebCrawler
-
-    @Inject
-    lateinit var webScraper: WebScraper
-
-    @POST
-    @Path("/crawl")
-    fun crawlUrl(request: Request): Response {
-        webCrawler.crawlUrl(request)
-        return Response(ResponseType.SUCCESS)
-    }
+class WebResource @Inject constructor(private var webScraper: WebScraper) {
 
     @POST
     @Path("/scrape")
