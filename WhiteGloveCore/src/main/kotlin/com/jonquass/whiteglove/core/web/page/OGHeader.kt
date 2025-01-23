@@ -1,6 +1,6 @@
-package com.jonquass.whiteglove.core.web
+package com.jonquass.whiteglove.core.web.page
 
-enum class Header(val attribute: String) {
+enum class OGHeader(val label: String) {
 
     OG_TITLE("og:title"),
     OG_DESCRIPTION("og:description"),

@@ -6,12 +6,10 @@ import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.data.config.WhiteGloveDataModule
 import com.jonquass.whiteglove.service.config.WhiteGloveConfiguration
 import com.jonquass.whiteglove.service.resources.WebResource
-import com.mysql.cj.jdbc.MysqlDataSource
 import io.dropwizard.core.Application
 import io.dropwizard.core.setup.Bootstrap
 import io.dropwizard.core.setup.Environment
 import javax.sql.DataSource
-
 
 class WhiteGloveService : Application<WhiteGloveConfiguration>() {
 
@@ -25,25 +23,16 @@ class WhiteGloveService : Application<WhiteGloveConfiguration>() {
     }
 
     override fun initialize(bootstrap: Bootstrap<WhiteGloveConfiguration>?) {
+        val whiteGloveDataModule = WhiteGloveDataModule()
         injector = Guice.createInjector(
-            WhiteGloveDataModule(), { binder ->
+            whiteGloveDataModule, { binder ->
                 binder.bind(DataSource::class.java)
                     .annotatedWith(GuiceJdbi::class.java)
-                    .toInstance(getDataSource())
+                    .toInstance(whiteGloveDataModule.getDataSource())
 
             }
         )
         injector.injectMembers(this)
-    }
-
-    private fun getDataSource(): MysqlDataSource {
-        val mysqlDS = MysqlDataSource()
-        mysqlDS.databaseName = System.getenv("MYSQL_DATABASE_NAME")
-        mysqlDS.serverName = System.getenv("MYSQL_SERVER_NAME")
-        mysqlDS.port = System.getenv("MYSQL_PORT").toInt()
-        mysqlDS.user = System.getenv("MYSQL_USER")
-        mysqlDS.password = System.getenv("MYSQL_PASSWORD")
-        return mysqlDS
     }
 
     override fun run(config: WhiteGloveConfiguration?, env: Environment?) {

@@ -2,54 +2,76 @@ package com.jonquass.whiteglove.data.web
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import com.jonquass.whiteglove.core.web.Header
-import com.jonquass.whiteglove.core.web.Page
-import com.jonquass.whiteglove.core.web.Request
-import com.jonquass.whiteglove.data.jdbi.PageDbManager
+import com.jonquass.whiteglove.core.jdbi.page.Page
+import com.jonquass.whiteglove.core.jdbi.page.PageLink
+import com.jonquass.whiteglove.core.web.page.OGHeader
+import com.jonquass.whiteglove.core.web.page.PageRequest
+import com.jonquass.whiteglove.core.web.page.ScrapedPage
+import com.jonquass.whiteglove.data.jdbi.page.PageDbManager
+import com.jonquass.whiteglove.data.jdbi.page.header.PageHeaderDbManager
+import com.jonquass.whiteglove.data.jdbi.page.link.PageLinkDbManager
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
 import java.net.URI
+import java.net.URISyntaxException
 import java.util.*
 
 @Singleton
-class WebScraper @Inject constructor(private var pageDbManager: PageDbManager) {
+class WebScraper @Inject constructor(
+    private var pageDbManager: PageDbManager,
+    private var pageHeaderDbManager: PageHeaderDbManager,
+    private var pageLinkDbManager: PageLinkDbManager,
+) {
 
-    fun scrapeLink(request: Request): Page {
-
-        val id = pageDbManager.insert(request.url)
-
-        println("ID $id")
-
-        val url = URI(request.url);
-        return scrapeLink(url)
+    fun scrapeLink(pageRequest: PageRequest): ScrapedPage? {
+        return scrapeLink(pageRequest.url)
     }
 
-    private fun scrapeLink(link: URI): Page {
-        val doc: Document = Jsoup.connect(link.toString()).get()
-        val headers: EnumMap<Header, String> = getHeaders(doc)
-        val links: Set<URI> = getLinks(doc, link)
-        return Page(
-            link,
+    fun scrapeLink(link: URI): ScrapedPage? {
+        val normalizedLink = URI("${link.scheme}://${link.host}${link.path}").normalize()
+        val doc: Document
+        try {
+            doc = Jsoup.connect(normalizedLink.toString()).get()
+        } catch (e: Throwable) {
+            println("Exception calling link $normalizedLink $e")
+            pageDbManager.updateScrapedAt(normalizedLink.toString())
+            return null
+        }
+
+        val newPage = pageDbManager.upsert(normalizedLink, doc)
+        val headers: EnumMap<OGHeader, String> = getHeaders(doc)
+        headers.forEach { entry ->
+            upsertHeaders(newPage.id, entry.key, entry.value)
+        }
+
+        val links: Set<URI> = getLinks(doc, normalizedLink)
+        links.forEach { l ->
+            upsertLinks(l, newPage.id)
+        }
+
+        return ScrapedPage(
+            normalizedLink,
             headers,
             doc.title(),
             links,
-            doc.body().html()
+            doc.body().html(),
+            newPage.id,
         )
     }
 
-    private fun getHeaders(doc: Document): EnumMap<Header, String> {
+    private fun getHeaders(doc: Document): EnumMap<OGHeader, String> {
         val headers: Elements = doc.select("meta")
-        val headersMap: EnumMap<Header, String> = EnumMap(Header::class.java)
+        val headersMap: EnumMap<OGHeader, String> = EnumMap(OGHeader::class.java)
         for (header in headers) {
             val content = header.attr("content")
             when (header.attr("property")) {
-                Header.OG_TITLE.attribute -> headersMap[Header.OG_TITLE] = content
-                Header.OG_DESCRIPTION.attribute -> headersMap[Header.OG_DESCRIPTION] = content
-                Header.OG_IMAGE.attribute -> headersMap[Header.OG_IMAGE] = content
-                Header.OG_TYPE.attribute -> headersMap[Header.OG_TYPE] = content
-                Header.OG_URL.attribute -> headersMap[Header.OG_URL] = content
-                Header.OG_SITE_NAME.attribute -> headersMap[Header.OG_SITE_NAME] = content
+                OGHeader.OG_TITLE.label -> headersMap[OGHeader.OG_TITLE] = content
+                OGHeader.OG_DESCRIPTION.label -> headersMap[OGHeader.OG_DESCRIPTION] = content
+                OGHeader.OG_IMAGE.label -> headersMap[OGHeader.OG_IMAGE] = content
+                OGHeader.OG_TYPE.label -> headersMap[OGHeader.OG_TYPE] = content
+                OGHeader.OG_URL.label -> headersMap[OGHeader.OG_URL] = content
+                OGHeader.OG_SITE_NAME.label -> headersMap[OGHeader.OG_SITE_NAME] = content
             }
         }
         return headersMap
@@ -59,9 +81,17 @@ class WebScraper @Inject constructor(private var pageDbManager: PageDbManager) {
         val links = doc.body()
             .getElementsByTag("a")
             .stream()
-            .map { l -> URI(l.attr("href")) }
+            .map { l ->
+                try {
+                    URI(l.attr("href").trim()).normalize()
+                } catch (e: URISyntaxException) {
+                    println("Invalid URI in page ${l.attr("href")} $e")
+                    null
+                }
+            }
             .distinct()
             .toList()
+            .filterNotNull()
 
         return filterLinks(links, requestLink)
     }
@@ -91,7 +121,43 @@ class WebScraper @Inject constructor(private var pageDbManager: PageDbManager) {
         link: URI,
         requestLink: URI
     ): Boolean {
-        return link.host != null && !requestLink.host.equals(link.host)
+        return !isHostValid(link, requestLink) || !isPathValid(link)
+    }
+
+    private fun isHostValid(link: URI, requestLink: URI): Boolean {
+        return link.host != null || !requestLink.host.equals(link.host)
+    }
+
+    private fun isPathValid(link: URI): Boolean {
+        return link.path == null ||
+                !(link.path.endsWith("jpg") ||
+                        link.path.endsWith("pdf") ||
+                        link.path.endsWith("xml") ||
+                        link.path.contains(" "))
+    }
+
+
+    private fun upsertHeaders(pageId: Long, headerType: OGHeader, value: String) {
+        val pageHeader = pageHeaderDbManager.get(pageId, headerType)
+        if (pageHeader == null) {
+            pageHeaderDbManager.insert(pageId, headerType, value)
+        } else if (pageHeader.value != value) {
+            pageHeaderDbManager.update(pageId, headerType, value)
+        }
+        //TODO Delete old headers
+    }
+
+    private fun upsertLinks(link: URI, pageId: Long) {
+        val pageLink = pageLinkDbManager.get(pageId, link)
+        if (pageLink !is PageLink) {
+            pageLinkDbManager.insert(pageId, link)
+        }
+        //TODO Delete old pageLinks
+
+        val page = pageDbManager.get(link)
+        if (page !is Page) {
+            pageDbManager.insert(link, false)
+        }
     }
 
 }

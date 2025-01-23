@@ -1,8 +1,8 @@
 package com.jonquass.whiteglove.core.web.response
 
-import com.jonquass.whiteglove.core.web.Page
+import com.jonquass.whiteglove.core.web.page.ScrapedPage
 
 data class Response(
     val status: ResponseType,
-    val content: Page? = null,
+    val content: ScrapedPage? = null,
 )

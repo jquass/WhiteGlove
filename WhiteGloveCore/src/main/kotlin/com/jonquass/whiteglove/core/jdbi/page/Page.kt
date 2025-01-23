@@ -1,4 +1,4 @@
-package com.jonquass.whiteglove.core.jdbi
+package com.jonquass.whiteglove.core.jdbi.page
 
 import java.net.URI
 import java.time.Instant
@@ -8,5 +8,7 @@ data class Page(
     val link: URI,
     val title: String? = null,
     val html: String? = null,
-    val dateFetched: Instant? = null,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val scrapedAt: Instant?,
 )
