@@ -1,4 +1,4 @@
-package com.jonquass.whiteglove.core.web.page
+package com.jonquass.whiteglove.core.web.page.header
 
 enum class OGHeader(val label: String) {
 

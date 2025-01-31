@@ -1,5 +1,6 @@
 package com.jonquass.whiteglove.core.web.page
 
+import com.jonquass.whiteglove.core.web.page.header.OGHeader
 import java.net.URI
 
 class ScrapedPage(

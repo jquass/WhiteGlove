@@ -4,7 +4,7 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.core.jdbi.page.PageHeader
-import com.jonquass.whiteglove.core.web.page.OGHeader
+import com.jonquass.whiteglove.core.web.page.header.OGHeader
 import org.jdbi.v3.core.Jdbi
 import java.time.Instant
 

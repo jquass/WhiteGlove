@@ -10,6 +10,10 @@ import org.jdbi.v3.sqlobject.SqlObjectPlugin
 
 class WhiteGloveDataModule : AbstractJdbiDefinitionModule(GuiceJdbi::class.java) {
 
+    companion object {
+        const val AGENT_NAME = "whiteglovebot"
+    }
+
     override fun configureJdbi() {
         bindPlugin().to(SqlObjectPlugin::class.java)
 

@@ -5,6 +5,7 @@ import com.google.inject.Singleton
 import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.core.jdbi.page.Page
 import org.jdbi.v3.core.Jdbi
+import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jsoup.nodes.Document
 import java.net.URI
 import java.time.Instant
@@ -12,15 +13,18 @@ import java.time.Instant
 @Singleton
 class PageDbManager @Inject constructor(@GuiceJdbi val jdbi: Jdbi) {
 
+    @Transaction
     fun upsert(link: URI, doc: Document): Page {
         var page = get(link)
         if (page == null) {
             val id = insert(link, true)
             page = get(id)
         } else if (!page.html.equals(doc.body().html()) || !page.title.equals(doc.title())) {
-            page = update(page.id, doc.title(), doc.html())
+            update(page.id, doc.title(), doc.html())
+            page = get(page.id)
         } else {
-            page = updateScrapedAt(page.id)
+            updateScrapedAt(page.id)
+            page = get(page.id)
         }
         if (page == null) {
             throw RuntimeException()
@@ -52,31 +56,33 @@ class PageDbManager @Inject constructor(@GuiceJdbi val jdbi: Jdbi) {
         }
     }
 
-    private fun update(id: Long, title: String, html: String): Page {
-        return jdbi.withExtension<Page, PageDao, Exception>(PageDao::class.java) { dao ->
+    private fun update(id: Long, title: String, html: String): Int {
+        return jdbi.withExtension<Int, PageDao, Exception>(PageDao::class.java) { dao ->
             dao.update(id, title, html, Instant.now().toEpochMilli())
-            dao.get(id)
         }
     }
 
-    private fun updateScrapedAt(id: Long): Page {
-        return jdbi.withExtension<Page, PageDao, Exception>(PageDao::class.java) { dao ->
+    private fun updateScrapedAt(id: Long): Int {
+        return jdbi.withExtension<Int, PageDao, Exception>(PageDao::class.java) { dao ->
             dao.updateScrapedAt(id, Instant.now().toEpochMilli())
-            dao.get(id)
         }
     }
 
-    fun updateScrapedAt(link: String): Page {
-        return jdbi.withExtension<Page, PageDao, Exception>(PageDao::class.java) { dao ->
+    fun updateScrapedAt(link: String): Int {
+        return jdbi.withExtension<Int, PageDao, Exception>(PageDao::class.java) { dao ->
             dao.updateScrapedAt(link, Instant.now().toEpochMilli())
-            dao.get(link)
         }
     }
 
     fun listForCrawling(host: String, limit: Int): List<Page> {
         return jdbi.withExtension<List<Page>, PageDao, Exception>(PageDao::class.java) { dao ->
-            dao.list(host, Instant.now().minusSeconds(60 * 60 * 24).toEpochMilli(), limit)
+            dao.list(host, Instant.now().minusSeconds(60 * 60 * 24 * 7).toEpochMilli(), limit)
         }
     }
 
+    fun searchInNaturalLanguageMode(search: String, limit: Int): List<Page> {
+        return jdbi.withExtension<List<Page>, PageDao, Exception>(PageDao::class.java) { dao ->
+            dao.searchInNaturalLanguageMode(search, limit)
+        }
+    }
 }

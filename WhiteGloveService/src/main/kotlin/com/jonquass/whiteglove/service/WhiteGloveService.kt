@@ -5,7 +5,10 @@ import com.google.inject.Injector
 import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.data.config.WhiteGloveDataModule
 import com.jonquass.whiteglove.service.config.WhiteGloveConfiguration
-import com.jonquass.whiteglove.service.resources.WebResource
+import com.jonquass.whiteglove.service.resources.CrawlResource
+import com.jonquass.whiteglove.service.resources.RobotsResource
+import com.jonquass.whiteglove.service.resources.ScrapeResource
+import com.jonquass.whiteglove.service.resources.SearchResource
 import io.dropwizard.core.Application
 import io.dropwizard.core.setup.Bootstrap
 import io.dropwizard.core.setup.Environment
@@ -14,6 +17,13 @@ import javax.sql.DataSource
 class WhiteGloveService : Application<WhiteGloveConfiguration>() {
 
     private lateinit var injector: Injector
+
+    private val resources: Set<Class<out Any>> = setOf(
+        CrawlResource::class.java,
+        RobotsResource::class.java,
+        ScrapeResource::class.java,
+        SearchResource::class.java,
+    )
 
     companion object {
         @JvmStatic
@@ -36,7 +46,9 @@ class WhiteGloveService : Application<WhiteGloveConfiguration>() {
     }
 
     override fun run(config: WhiteGloveConfiguration?, env: Environment?) {
-        env?.jersey()?.register(injector.getInstance(WebResource::class.java))
+        resources.forEach { r ->
+            env?.jersey()?.register(injector.getInstance(r))
+        }
     }
 
 }

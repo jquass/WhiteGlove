@@ -2,17 +2,21 @@ package com.jonquass.whiteglove.data.web
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import com.jonquass.whiteglove.core.api.v1.scrape.ScrapeRequest
 import com.jonquass.whiteglove.core.jdbi.page.Page
 import com.jonquass.whiteglove.core.jdbi.page.PageLink
-import com.jonquass.whiteglove.core.web.page.OGHeader
-import com.jonquass.whiteglove.core.web.page.PageRequest
 import com.jonquass.whiteglove.core.web.page.ScrapedPage
+import com.jonquass.whiteglove.core.web.page.header.OGHeader
 import com.jonquass.whiteglove.data.jdbi.page.PageDbManager
 import com.jonquass.whiteglove.data.jdbi.page.header.PageHeaderDbManager
 import com.jonquass.whiteglove.data.jdbi.page.link.PageLinkDbManager
+import crawlercommons.robots.SimpleRobotRules
+import crawlercommons.robots.SimpleRobotRules.RobotRule
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.*
@@ -20,44 +24,71 @@ import java.util.*
 @Singleton
 class WebScraper @Inject constructor(
     private var pageDbManager: PageDbManager,
-    private var pageHeaderDbManager: PageHeaderDbManager,
+    private var robotsTxtClient: RobotsTxtClient,
     private var pageLinkDbManager: PageLinkDbManager,
+    private var pageHeaderDbManager: PageHeaderDbManager,
 ) {
 
-    fun scrapeLink(pageRequest: PageRequest): ScrapedPage? {
-        return scrapeLink(pageRequest.url)
+    private val logger: Logger = LoggerFactory.getLogger(javaClass)
+
+    fun scrapeLink(scrapeRequest: ScrapeRequest): ScrapedPage? {
+        return scrapeLink(scrapeRequest.url)
     }
 
     fun scrapeLink(link: URI): ScrapedPage? {
-        val normalizedLink = URI("${link.scheme}://${link.host}${link.path}").normalize()
-        val doc: Document
-        try {
-            doc = Jsoup.connect(normalizedLink.toString()).get()
-        } catch (e: Throwable) {
-            println("Exception calling link $normalizedLink $e")
-            pageDbManager.updateScrapedAt(normalizedLink.toString())
+        val robotsTxt = robotsTxtClient.fetchRobotsTxt(link)
+        return scrapeLink(link, robotsTxt)
+    }
+
+    private fun scrapeLink(link: URI, robotsTxt: SimpleRobotRules): ScrapedPage? {
+        logger.info("Scraping Link $link")
+
+        if (link.scheme == null || link.host == null) {
+            logger.warn("Skipping link without scheme and/or host $link")
             return null
         }
 
-        val newPage = pageDbManager.upsert(normalizedLink, doc)
+        if (robotsTxt.isAllowNone) {
+            logger.info("Robots.txt is allow none $link")
+            return null
+        }
+
+        if (robotsTxt.robotRules.contains(RobotRule("/", false))) {
+            logger.info("Robots.txt does not allow / $link")
+            return null
+        }
+
+        // check link here if allowed specifically
+
+        val doc: Document = fetchDocument(link) ?: return null
+
+        val page = pageDbManager.upsert(link, doc)
         val headers: EnumMap<OGHeader, String> = getHeaders(doc)
         headers.forEach { entry ->
-            upsertHeaders(newPage.id, entry.key, entry.value)
+            upsertHeaders(page.id, entry.key, entry.value)
         }
-
-        val links: Set<URI> = getLinks(doc, normalizedLink)
+        val links: Set<URI> = getLinks(doc, link, robotsTxt)
         links.forEach { l ->
-            upsertLinks(l, newPage.id)
+            upsertLinks(l, page.id)
         }
-
         return ScrapedPage(
-            normalizedLink,
+            link,
             headers,
             doc.title(),
             links,
             doc.body().html(),
-            newPage.id,
+            page.id,
         )
+    }
+
+    private fun fetchDocument(link: URI): Document? {
+        try {
+            return Jsoup.connect(link.toString()).get()
+        } catch (e: Throwable) {
+            logger.error("Exception calling link $link", e)
+            pageDbManager.updateScrapedAt(link.toString())
+        }
+        return null
     }
 
     private fun getHeaders(doc: Document): EnumMap<OGHeader, String> {
@@ -77,7 +108,7 @@ class WebScraper @Inject constructor(
         return headersMap
     }
 
-    private fun getLinks(doc: Document, requestLink: URI): Set<URI> {
+    private fun getLinks(doc: Document, requestLink: URI, robotsTxt: SimpleRobotRules): Set<URI> {
         val links = doc.body()
             .getElementsByTag("a")
             .stream()
@@ -85,7 +116,7 @@ class WebScraper @Inject constructor(
                 try {
                     URI(l.attr("href").trim()).normalize()
                 } catch (e: URISyntaxException) {
-                    println("Invalid URI in page ${l.attr("href")} $e")
+                    logger.error("Skipping Invalid URI in page ${l.attr("href")}", e)
                     null
                 }
             }
@@ -93,13 +124,13 @@ class WebScraper @Inject constructor(
             .toList()
             .filterNotNull()
 
-        return filterLinks(links, requestLink)
+        return filterLinks(links, requestLink, robotsTxt)
     }
 
-    private fun filterLinks(links: List<URI>, requestLink: URI): Set<URI> {
+    private fun filterLinks(links: List<URI>, requestLink: URI, robotsTxt: SimpleRobotRules): Set<URI> {
         val validLinks = mutableSetOf<URI>()
         for (link in links) {
-            if (shouldSkipLink(link, requestLink)) {
+            if (!shouldProcessLink(link, requestLink, robotsTxt)) {
                 continue
             }
 
@@ -107,9 +138,16 @@ class WebScraper @Inject constructor(
             if (link.path != null) {
                 path = link.path
             }
-            val validLink = URI("${requestLink.scheme}://${requestLink.host}$path")
+            val validLink: URI
+            try {
+                validLink = URI("${requestLink.scheme}://${requestLink.host}$path")
+            } catch (e: Exception) {
+                logger.error("Invalid URI $requestLink", e)
+                continue
+            }
+
             if (validLinks.contains(validLink)) {
-                continue;
+                continue
             }
 
             validLinks.add(validLink)
@@ -117,11 +155,30 @@ class WebScraper @Inject constructor(
         return validLinks
     }
 
-    private fun shouldSkipLink(
+    private fun shouldProcessLink(
         link: URI,
-        requestLink: URI
+        requestLink: URI,
+        robotsTxt: SimpleRobotRules
     ): Boolean {
-        return !isHostValid(link, requestLink) || !isPathValid(link)
+        return isLinkAllowedByRobotsTxt(link, robotsTxt) &&
+                isHostValid(link, requestLink) &&
+                isPathValid(link)
+    }
+
+    private fun isLinkAllowedByRobotsTxt(link: URI, robotsTxt: SimpleRobotRules): Boolean {
+        if (link.path == null) {
+            return false
+        }
+
+        for (robotRule in robotsTxt.robotRules) {
+            if (robotRule.isAllow && link.path.startsWith(robotRule.prefix)) {
+                return true
+            }
+            if (!robotRule.isAllow && link.path.startsWith(robotRule.prefix)) {
+                return false;
+            }
+        }
+        return true
     }
 
     private fun isHostValid(link: URI, requestLink: URI): Boolean {

@@ -43,7 +43,7 @@ interface PageDao {
         @Bind("title") title: String,
         @Bind("html") html: String,
         @Bind("activity_at") activityAt: Long,
-    )
+    ): Int
 
     @SqlUpdate(
         """
@@ -55,7 +55,7 @@ interface PageDao {
     fun updateScrapedAt(
         @Bind("id") id: Long,
         @Bind("scraped_at") scrapedAt: Long,
-    )
+    ): Int
 
     @SqlUpdate(
         """
@@ -67,7 +67,7 @@ interface PageDao {
     fun updateScrapedAt(
         @Bind("link") link: String,
         @Bind("scraped_at") scrapedAt: Long,
-    )
+    ): Int
 
     @SqlQuery(
         """
@@ -80,6 +80,34 @@ interface PageDao {
     fun list(
         @Bind("host") host: String,
         @Bind("scraped_at") scrapedAt: Long,
+        @Bind("limit") limit: Int,
+    ): List<Page>
+
+    @SqlQuery(
+        """
+        SELECT * 
+        FROM pages p
+            WHERE MATCH(html) AGAINST (:search IN NATURAL LANGUAGE MODE)
+            AND scraped_at IS NOT NULL
+            LIMIT :limit
+        """
+    )
+    fun searchInNaturalLanguageMode(
+        @Bind("search") search: String,
+        @Bind("limit") limit: Int,
+    ): List<Page>
+
+    @SqlQuery(
+        """
+        SELECT * 
+        FROM pages p
+            WHERE MATCH(html) AGAINST (:search IN BOOLEAN MODE)
+            AND scraped_at IS NOT NULL
+            LIMIT :limit
+        """
+    )
+    fun searchInBooleanMode(
+        @Bind("search") search: String,
         @Bind("limit") limit: Int,
     ): List<Page>
 }

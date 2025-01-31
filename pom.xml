@@ -12,6 +12,7 @@
         <module>WhiteGloveService</module>
         <module>WhiteGloveCore</module>
         <module>WhiteGloveData</module>
+        <module>WhiteGloveJobs</module>
     </modules>
 
     <properties>
