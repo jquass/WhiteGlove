@@ -11,14 +11,19 @@ import jakarta.ws.rs.Path
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
 import org.apache.commons.lang3.ObjectUtils
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 @Path("/crawl")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 class CrawlResource @Inject constructor(private var webCrawler: WebCrawler) {
 
+    private val logger: Logger = LoggerFactory.getLogger(javaClass)
+
     @POST
     fun crawlUrl(crawlRequest: CrawlRequest): Response<ObjectUtils.Null> {
+        logger.debug("CrawlRequest {}", crawlRequest)
         webCrawler.crawlDomain(crawlRequest)
         return Response(ResponseType.SUCCESS)
     }

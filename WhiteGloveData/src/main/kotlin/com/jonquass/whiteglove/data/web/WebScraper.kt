@@ -35,14 +35,13 @@ class WebScraper @Inject constructor(
         return scrapeLink(scrapeRequest.url)
     }
 
-    fun scrapeLink(link: URI): ScrapedPage? {
+    private fun scrapeLink(link: URI): ScrapedPage? {
         val robotsTxt = robotsTxtClient.fetchRobotsTxt(link)
         return scrapeLink(link, robotsTxt)
     }
 
-    private fun scrapeLink(link: URI, robotsTxt: SimpleRobotRules): ScrapedPage? {
+    fun scrapeLink(link: URI, robotsTxt: SimpleRobotRules): ScrapedPage? {
         logger.info("Scraping Link $link")
-
         if (link.scheme == null || link.host == null) {
             logger.warn("Skipping link without scheme and/or host $link")
             return null
@@ -58,7 +57,11 @@ class WebScraper @Inject constructor(
             return null
         }
 
-        // check link here if allowed specifically
+        val matchedRobotRules: List<RobotRule> = matchRules(robotsTxt, link)
+        if (matchedRobotRules.isNotEmpty()) {
+            logger.info("Matches Rules $matchedRobotRules")
+            return null
+        }
 
         val doc: Document = fetchDocument(link) ?: return null
 
@@ -79,6 +82,21 @@ class WebScraper @Inject constructor(
             doc.body().html(),
             page.id,
         )
+    }
+
+    private fun matchRules(robotsTxt: SimpleRobotRules, link: URI): List<RobotRule> {
+        val matchedRules: MutableList<RobotRule> = mutableListOf()
+        for (robotRule in robotsTxt.robotRules) {
+            if (ruleMatchesUrl(robotRule, link)) {
+                matchedRules.add(robotRule)
+            }
+        }
+        return matchedRules
+    }
+
+    private fun ruleMatchesUrl(robotRule: RobotRule, link: URI): Boolean {
+
+        return true;
     }
 
     private fun fetchDocument(link: URI): Document? {

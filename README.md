@@ -29,10 +29,11 @@ Scrape a single url
     - Stores the page HTML
     - Stores the headers
     - Stores links
+- Returns the scrape result
 
 ### Crawl
 
-Crawl an entire domain
+Scrapes all links stored in the db for an entire domain
 
     POST    /api/v1/crawl     {"url":"https://www.website.com", "limit": 100}
 
@@ -43,17 +44,18 @@ Crawl an entire domain
     - Store the page HTML
     - Store the headers
     - Store links
-- Fetches links from the db and attempts to scrape them
+- Repeats scraping for other links in the db for the domain
 
 ### Search
 
     POST    /api/v1/search    {"search":"Where is Waldo", "limit": 100}
 
-- Searches for matching pages using natural language mode
+- Searches the stored html for matching pages using natural language mode
+- Returns a list of search results
 
 ### Robots
 
     POST    /api/v1/robots    {"url":"https://www.website.com"}
 
-- Fetch robots.txt for the domain
+- Fetches and returns robots.txt for the domain
 
