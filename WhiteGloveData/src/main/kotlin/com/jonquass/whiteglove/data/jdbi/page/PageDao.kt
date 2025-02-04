@@ -11,15 +11,18 @@ interface PageDao {
     @GetGeneratedKeys
     @SqlUpdate(
         """
-        INSERT INTO pages (link, host, created_at, updated_at, scraped_at) 
-        VALUES (:link, :host, :activity_at, :activity_at, :scraped_at)
+        INSERT INTO pages (link, title, html, host, created_at, updated_at, scraped_at, source) 
+        VALUES (:link, :title, :html, :host, :activity_at, :activity_at, :scraped_at, :source)
         """
     )
     fun insert(
         @Bind("link") link: String,
+        @Bind("title") title: String?,
+        @Bind("html") html: String?,
         @Bind("host") host: String,
         @Bind("activity_at") activityAt: Long,
         @Bind("scraped_at") scrapedAt: Long?,
+        @Bind("source") source: String,
     ): Long
 
     @SqlQuery("SELECT * FROM pages WHERE id = :id")
@@ -74,6 +77,7 @@ interface PageDao {
         SELECT * FROM pages 
         WHERE host = :host 
             AND (scraped_at IS NULL OR scraped_at < :scraped_at)
+        ORDER BY created_at DESC
         LIMIT :limit
         """
     )

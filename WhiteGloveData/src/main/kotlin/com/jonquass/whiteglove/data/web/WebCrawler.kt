@@ -2,11 +2,9 @@ package com.jonquass.whiteglove.data.web
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import com.jonquass.whiteglove.core.api.v1.crawl.CrawlRequest
 import com.jonquass.whiteglove.core.jdbi.page.Page
 import com.jonquass.whiteglove.data.jdbi.page.PageDbManager
 import crawlercommons.robots.SimpleRobotRules
-import crawlercommons.robots.SimpleRobotRules.RobotRule
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -24,10 +22,6 @@ class WebCrawler @Inject constructor(
     private val hardLimit: Int = 1_000_000
     private val defaultBatchSize: Int = 100
 
-    fun crawlDomain(crawlRequest: CrawlRequest) {
-        crawlDomain(crawlRequest.url, crawlRequest.limit)
-    }
-
     fun crawlDomain(link: URI, limit: Int? = hardLimit) {
         logger.debug("Crawling URI {} with limit {}", link, limit)
         val robotsTxt = robotsTxtClient.fetchRobotsTxt(link)
@@ -37,12 +31,9 @@ class WebCrawler @Inject constructor(
             return
         }
 
-        if (robotsTxt.robotRules.contains(RobotRule("/", false))) {
-            logger.info("Robots.txt does not allow / $link")
-            return
-        }
-
         // TODO Process sitemap(s)
+
+        robotsTxt.sitemaps
 
         val crawlLimit = min(limit!!, hardLimit)
         val batchSize = min(defaultBatchSize, crawlLimit)

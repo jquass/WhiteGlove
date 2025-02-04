@@ -3,7 +3,6 @@ package com.jonquass.whiteglove.data.config
 import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.data.jdbi.page.PageMapper
 import com.jonquass.whiteglove.data.jdbi.page.header.PageHeaderMapper
-import com.jonquass.whiteglove.data.jdbi.page.link.PageLinkMapper
 import com.mysql.cj.jdbc.MysqlDataSource
 import org.jdbi.v3.guice.AbstractJdbiDefinitionModule
 import org.jdbi.v3.sqlobject.SqlObjectPlugin
@@ -19,7 +18,6 @@ class WhiteGloveDataModule : AbstractJdbiDefinitionModule(GuiceJdbi::class.java)
 
         bindRowMapper().to(PageMapper::class.java)
         bindRowMapper().to(PageHeaderMapper::class.java)
-        bindRowMapper().to(PageLinkMapper::class.java)
     }
 
     fun getDataSource(): MysqlDataSource {

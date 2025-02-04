@@ -1,6 +1,7 @@
 package com.jonquass.whiteglove.data.jdbi.page
 
 import com.jonquass.whiteglove.core.jdbi.page.Page
+import com.jonquass.whiteglove.core.web.page.PageSource
 import org.jdbi.v3.core.mapper.RowMapper
 import org.jdbi.v3.core.statement.StatementContext
 import java.net.URI
@@ -20,7 +21,9 @@ class PageMapper : RowMapper<Page> {
             rs.getString("html"),
             Instant.ofEpochMilli(rs.getLong("created_at")),
             Instant.ofEpochMilli(rs.getLong("updated_at")),
-            Instant.ofEpochMilli(rs.getLong("scraped_at"))
+            Instant.ofEpochMilli(rs.getLong("scraped_at")),
+            URI(rs.getString("host")),
+            PageSource.valueOf(rs.getString("source")),
         )
     }
 }

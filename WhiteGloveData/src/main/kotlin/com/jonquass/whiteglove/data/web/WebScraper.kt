@@ -3,15 +3,12 @@ package com.jonquass.whiteglove.data.web
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.jonquass.whiteglove.core.api.v1.scrape.ScrapeRequest
-import com.jonquass.whiteglove.core.jdbi.page.Page
-import com.jonquass.whiteglove.core.jdbi.page.PageLink
+import com.jonquass.whiteglove.core.web.page.PageSource
 import com.jonquass.whiteglove.core.web.page.ScrapedPage
 import com.jonquass.whiteglove.core.web.page.header.OGHeader
 import com.jonquass.whiteglove.data.jdbi.page.PageDbManager
 import com.jonquass.whiteglove.data.jdbi.page.header.PageHeaderDbManager
-import com.jonquass.whiteglove.data.jdbi.page.link.PageLinkDbManager
 import crawlercommons.robots.SimpleRobotRules
-import crawlercommons.robots.SimpleRobotRules.RobotRule
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
@@ -25,7 +22,7 @@ import java.util.*
 class WebScraper @Inject constructor(
     private var pageDbManager: PageDbManager,
     private var robotsTxtClient: RobotsTxtClient,
-    private var pageLinkDbManager: PageLinkDbManager,
+    private var robotsTxtManager: RobotsTxtManager,
     private var pageHeaderDbManager: PageHeaderDbManager,
 ) {
 
@@ -47,32 +44,23 @@ class WebScraper @Inject constructor(
             return null
         }
 
-        if (robotsTxt.isAllowNone) {
-            logger.info("Robots.txt is allow none $link")
-            return null
-        }
-
-        if (robotsTxt.robotRules.contains(RobotRule("/", false))) {
-            logger.info("Robots.txt does not allow / $link")
-            return null
-        }
-
-        val matchedRobotRules: List<RobotRule> = matchRules(robotsTxt, link)
-        if (matchedRobotRules.isNotEmpty()) {
-            logger.info("Matches Rules $matchedRobotRules")
+        if (!robotsTxtManager.shouldScrape(link, robotsTxt)) {
+            logger.info("Skipping link due to robots.txt rules")
             return null
         }
 
         val doc: Document = fetchDocument(link) ?: return null
 
-        val page = pageDbManager.upsert(link, doc)
+        val page = pageDbManager.upsert(link, doc, PageSource.SCRAPE)
         val headers: EnumMap<OGHeader, String> = getHeaders(doc)
+
+        // TODO Handle deleted headers by fetching existing and diffing
         headers.forEach { entry ->
-            upsertHeaders(page.id, entry.key, entry.value)
+            upsertHeader(page.id, entry.key, entry.value)
         }
         val links: Set<URI> = getLinks(doc, link, robotsTxt)
         links.forEach { l ->
-            upsertLinks(l, page.id)
+            pageDbManager.upsert(l, PageSource.SCRAPE)
         }
         return ScrapedPage(
             link,
@@ -82,21 +70,6 @@ class WebScraper @Inject constructor(
             doc.body().html(),
             page.id,
         )
-    }
-
-    private fun matchRules(robotsTxt: SimpleRobotRules, link: URI): List<RobotRule> {
-        val matchedRules: MutableList<RobotRule> = mutableListOf()
-        for (robotRule in robotsTxt.robotRules) {
-            if (ruleMatchesUrl(robotRule, link)) {
-                matchedRules.add(robotRule)
-            }
-        }
-        return matchedRules
-    }
-
-    private fun ruleMatchesUrl(robotRule: RobotRule, link: URI): Boolean {
-
-        return true;
     }
 
     private fun fetchDocument(link: URI): Document? {
@@ -204,35 +177,21 @@ class WebScraper @Inject constructor(
     }
 
     private fun isPathValid(link: URI): Boolean {
-        return link.path == null ||
+        return link.path != null &&
                 !(link.path.endsWith("jpg") ||
                         link.path.endsWith("pdf") ||
                         link.path.endsWith("xml") ||
                         link.path.contains(" "))
     }
 
-
-    private fun upsertHeaders(pageId: Long, headerType: OGHeader, value: String) {
+    private fun upsertHeader(pageId: Long, headerType: OGHeader, value: String) {
         val pageHeader = pageHeaderDbManager.get(pageId, headerType)
         if (pageHeader == null) {
             pageHeaderDbManager.insert(pageId, headerType, value)
         } else if (pageHeader.value != value) {
             pageHeaderDbManager.update(pageId, headerType, value)
         }
-        //TODO Delete old headers
-    }
 
-    private fun upsertLinks(link: URI, pageId: Long) {
-        val pageLink = pageLinkDbManager.get(pageId, link)
-        if (pageLink !is PageLink) {
-            pageLinkDbManager.insert(pageId, link)
-        }
-        //TODO Delete old pageLinks
-
-        val page = pageDbManager.get(link)
-        if (page !is Page) {
-            pageDbManager.insert(link, false)
-        }
     }
 
 }

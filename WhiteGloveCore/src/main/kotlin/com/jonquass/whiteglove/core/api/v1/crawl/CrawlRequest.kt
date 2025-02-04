@@ -7,5 +7,5 @@ import java.net.URI
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 data class CrawlRequest(
     @JsonProperty("url") val url: URI,
-    @JsonProperty("limit") val limit: Int? = 100,
+    @JsonProperty("limit") val limit: Int = 100,
 )

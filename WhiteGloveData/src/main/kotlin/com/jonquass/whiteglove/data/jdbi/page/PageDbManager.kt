@@ -4,6 +4,7 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.jonquass.whiteglove.core.jdbi.GuiceJdbi
 import com.jonquass.whiteglove.core.jdbi.page.Page
+import com.jonquass.whiteglove.core.web.page.PageSource
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jsoup.nodes.Document
@@ -14,10 +15,10 @@ import java.time.Instant
 class PageDbManager @Inject constructor(@GuiceJdbi val jdbi: Jdbi) {
 
     @Transaction
-    fun upsert(link: URI, doc: Document): Page {
+    fun upsert(link: URI, doc: Document, source: PageSource): Page {
         var page = get(link)
         if (page == null) {
-            val id = insert(link, true)
+            val id = insert(link, doc, true, source)
             page = get(id)
         } else if (!page.html.equals(doc.body().html()) || !page.title.equals(doc.title())) {
             update(page.id, doc.title(), doc.html())
@@ -26,21 +27,28 @@ class PageDbManager @Inject constructor(@GuiceJdbi val jdbi: Jdbi) {
             updateScrapedAt(page.id)
             page = get(page.id)
         }
-        if (page == null) {
-            throw RuntimeException()
-        }
 
-        return page
+        return page!!
     }
 
-    fun insert(link: URI, scraped: Boolean): Long {
+    @Transaction
+    fun upsert(link: URI, source: PageSource): Page {
+        var page = get(link)
+        if (page == null) {
+            val id = insert(link, null, false, source)
+            page = get(id)
+        }
+        return page!!
+    }
+
+    private fun insert(link: URI, doc: Document?, scraped: Boolean, source: PageSource): Long {
         val activityAt: Long = Instant.now().toEpochMilli()
         var scrapedAt: Long? = null
         if (scraped) {
             scrapedAt = activityAt
         }
         return jdbi.withExtension<Long, PageDao, Exception>(PageDao::class.java) { dao ->
-            dao.insert(link.toString(), link.host, activityAt, scrapedAt)
+            dao.insert(link.toString(), doc?.title(), doc?.html(), link.host, activityAt, scrapedAt, source.name)
         }
     }
 

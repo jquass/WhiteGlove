@@ -13,6 +13,7 @@ import jakarta.ws.rs.core.MediaType
 import org.apache.commons.lang3.ObjectUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import kotlin.math.min
 
 @Path("/crawl")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -21,10 +22,12 @@ class CrawlResource @Inject constructor(private var webCrawler: WebCrawler) {
 
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
+    private val serviceCrawlLimit = 100
+
     @POST
     fun crawlUrl(crawlRequest: CrawlRequest): Response<ObjectUtils.Null> {
         logger.debug("CrawlRequest {}", crawlRequest)
-        webCrawler.crawlDomain(crawlRequest)
+        webCrawler.crawlDomain(crawlRequest.url, min(crawlRequest.limit, serviceCrawlLimit))
         return Response(ResponseType.SUCCESS)
     }
 
